@@ -1,20 +1,30 @@
+# --import--
 import polars as pl
 import polars.selectors as cs
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 
+# --visualize table--
 from src.polar_viewer import show, show_tables
+
 from scipy import stats
+from itertools import combinations
+from scipy.stats import chi2_contingency, f_oneway, kruskal
+from scipy.cluster.hierarchy import linkage, dendrogram
 from sklearn.ensemble import IsolationForest
 # -- typing --
-from typing import TypeAlias
+from typing import TypeAlias, Literal
 from pathlib import Path
 
 DataSource: TypeAlias= (pl.DataFrame | pl.LazyFrame)
 
 # -- NUMERIC TYPE --
 def show_describe_numeric(data: DataSource) -> None:
+    """Display descriptive statistics for all numeric columns.
+
+    Shows count, null count, mean, variance, quartiles, skewness, and kurtosis.
+    """
     numeric_cols = data.select(cs.numeric()).columns
     summary = pl.DataFrame({
         "columns": numeric_cols,
@@ -35,6 +45,10 @@ def show_describe_numeric(data: DataSource) -> None:
     return
 
 def show_transform_diagnostics(data: DataSource) -> None:
+    """Display transformation diagnostics for numeric columns.
+
+    Compares skewness before and after Box-Cox or Yeo-Johnson transformations.
+    """
     numeric_cols = data.select(cs.numeric()).columns
     row = []
     for col in numeric_cols:
@@ -46,6 +60,10 @@ def show_transform_diagnostics(data: DataSource) -> None:
     return 
 
 def show_iqr_outlier_flags_matrix(data: DataSource,k: float=1.5) -> None:
+    """Display an IQR-based outlier flag matrix.
+
+    Each column contains boolean flags indicating whether a value is an IQR outlier.
+    """
     numeric_cols = data.select(cs.numeric()).columns
     df = None
     for col in numeric_cols:
@@ -60,6 +78,10 @@ def show_iqr_outlier_flags_matrix(data: DataSource,k: float=1.5) -> None:
     return
 
 def show_zscore_flags_matrix(data: DataSource, threshold: float = 3.0) -> None:
+    """Display a Z-score outlier flag matrix.
+
+    Flags observations whose absolute Z-score exceeds the given threshold.
+    """
     numeric_cols = data.select(cs.numeric()).columns
     df = None
     for col in numeric_cols:
@@ -73,7 +95,11 @@ def show_zscore_flags_matrix(data: DataSource, threshold: float = 3.0) -> None:
     show(df, title="show_zscore_flags_matrix")
     return
 
-def show_mod_zscore_flags_matrie(data: DataSource, threshold: float = 3.5) -> None:
+def show_mod_zscore_flags_matrix(data: DataSource, threshold: float = 3.5) -> None:
+    """Display a modified Z-score outlier flag matrix.
+
+    Uses the median and MAD to identify robust outliers.
+    """
     numeric_cols = data.select(cs.numeric()).columns
     df = None
     for col in numeric_cols:
@@ -89,6 +115,10 @@ def show_mod_zscore_flags_matrie(data: DataSource, threshold: float = 3.5) -> No
 
 # -- CATEGORY TYPE --
 def show_describe_category(data: DataSource) -> None:
+    """Display summary statistics for categorical columns.
+
+    Shows the number of unique values, mode, and entropy-based diversity measures.
+    """
     category_cols = data.select(cs.string()).columns
     summary = []
     for col in category_cols:
@@ -102,6 +132,10 @@ def show_describe_category(data: DataSource) -> None:
     return
 
 def show_relative_category(data: DataSource) -> None:
+    """Display frequency tables for categorical columns.
+
+    Shows counts and relative proportions for each category.
+    """
     category_cols = data.select(cs.string()).columns
     freqs = []
     for col in category_cols:
@@ -111,6 +145,10 @@ def show_relative_category(data: DataSource) -> None:
     return
 
 def show_rare_category(data: DataSource) -> None:
+    """Display rare categories for each categorical column.
+
+    Categories occurring in less than 1% of rows are reported.
+    """
     threshold = len(data) * 0.01
     category_cols = data.select(cs.string()).columns
 
@@ -127,6 +165,7 @@ def show_rare_category(data: DataSource) -> None:
 
 # -- ALL --
 def get_cat_freq(data: DataSource, col: str) -> DataSource:
+    """Return category frequencies and proportions for a column."""
     return (data[col]
             .value_counts()
             .sort("count", descending=True)
@@ -136,6 +175,10 @@ def get_cat_freq(data: DataSource, col: str) -> DataSource:
             )
 
 def summary_categorical(data: DataSource, col: str) -> dict:
+    """Compute summary statistics for a categorical column.
+
+    Returns the mode, entropy, and maximum possible entropy.
+    """
     freq = get_cat_freq(data,col)
     mode = freq[col][0]
     probs = freq["proportion"].to_numpy() 
@@ -150,6 +193,7 @@ def summary_categorical(data: DataSource, col: str) -> dict:
             }
 
 def show_null_counts(data: DataSource) -> None:
+    """Display the number of null values for every column."""
     df = pl.DataFrame({
         "column": data.columns,
         "dtype": [data[col].dtype for col in data.columns],
@@ -159,6 +203,10 @@ def show_null_counts(data: DataSource) -> None:
     return
 
 def transform_diagnostics(data: DataSource, col: str) -> dict:
+    """Evaluate transformations for reducing skewness.
+
+    Uses Box-Cox for strictly positive data and Yeo-Johnson otherwise.
+    """
     s = data[col].drop_nulls()
     result = {"raw_skew": stats.skew(s)}
 
@@ -178,6 +226,7 @@ def transform_diagnostics(data: DataSource, col: str) -> dict:
     return result
 
 def iqr_outlier_flags(data: DataSource, col: str, k: float=1.5) -> DataSource:
+    """Return boolean flags for IQR-based outliers in a numeric column."""
     q1 = data[col].quantile(0.25)
     q3 = data[col].quantile(0.75)
     iqr = q3 - q1
@@ -188,13 +237,19 @@ def iqr_outlier_flags(data: DataSource, col: str, k: float=1.5) -> DataSource:
                 .alias((f"{col}_iqr_outlier")))
 
 def zscore_flags(data: DataSource, col, threshold: float = 3.0) -> DataSource:
+    """Return boolean flags for Z-score outliers in a numeric column."""
     mean, std = data[col].mean(), data[col].std()
     return data.select(
             (((pl.col(col) - mean)/ std).abs() > threshold)
             .alias(f"{col}_zscore_outlier"))
 
 
-def modified_zscore_flags(data: DataSource, col, threshold: float = 3.5) -> DataSource:
+def modified_zscore_flags(data: DataSource, col: str,
+                          threshold: float = 3.5) -> DataSource:
+    """Return boolean flags for modified Z-score outliers.
+
+    Uses the median absolute deviation (MAD) for robust detection.
+    """
     median = data[col].median()
     mad = ((data[col] - median).abs()).median() # median absolute deviation
     # 0.6745 scales MAD to be comparable to std under normality
@@ -204,6 +259,10 @@ def modified_zscore_flags(data: DataSource, col, threshold: float = 3.5) -> Data
 
 def show_isolation_forest_flags_matrix(data: DataSource,
                                        contamination: float = 0.02) -> None:
+    """Display Isolation Forest anomaly detection results.
+
+    Shows predicted outlier labels and anomaly scores for numeric data.
+    """
     X = data.select(cs.numeric()).to_numpy()
     iso = IsolationForest(contamination=contamination, random_state=42)
     preds = iso.fit_predict(X) # -1 = outlier, 1 = inlier
@@ -232,8 +291,12 @@ def map_quit() -> None:
     return
 
 def plot_distribution_numeric(data: DataSource,
-                              dist="norm",
+                              dist: str ="norm",
                               path: Path | None = None) -> None:
+    """Plot the distribution of each numeric column.
+
+    Generates a histogram with KDE, boxplot, and Q-Q plot, and optionally saves the figures.
+    """
     numeric_cols = data.select(cs.numeric()).columns
 
     for col in numeric_cols:
@@ -257,4 +320,66 @@ def plot_distribution_numeric(data: DataSource,
             plt.savefig(path / f"{col}_distribution.png")
 
         plt.show()
+    return
+
+def plot_heatmap(data: DataSource,
+                 method: Literal['pearson', 'spearman', 'kendall'] = 'pearson',
+                 path: Path | None = None) -> None:
+    '''correlation_matrix'''
+    numeric_df = data.select(cs.numeric())
+    corr = numeric_df.to_pandas().corr(method=method)
+    n = len(corr.columns)
+
+    # Adjust these values to your preference
+    cell_size = 0.7      # inches per cell
+    min_size = 6         # minimum figure size
+    max_size = 20        # maximum figure size
+
+    fig_size = max(min_size, min(max_size, n * cell_size))
+
+    # Annotation font size
+    annot_size = max(5, min(12, 16 - n // 2))
+
+    plt.figure(figsize=(fig_size, fig_size))
+
+    sns.heatmap(corr,
+                annot=True,
+                annot_kws={'size': annot_size},
+                cmap='coolwarm',
+                fmt='.2f',
+                linewidths=0.5,
+                linecolor='black',
+                square=True,
+                xticklabels=corr.columns,
+                yticklabels=corr.columns)
+    plt.title('Correlation matrix')
+
+    if path:
+        plt.savefig(path / "correlation_matrix.png")
+
+    plt.show()
+    return
+
+# -- Bivariate/multivariate --
+def show_cat_cat(data: DataSource) -> None:
+    '''category-category'''
+    results= []
+    for c1, c2 in combinations(category_cols,2):
+        ct = df.group_by([c1, c2]).agg(pl.len().alias("n")).pivot(
+            values="n", index=c1, columns=c2, aggregate_function="first"
+        ).fill_null(0)
+        ct_np = ct.drop(c1).to_numpy()
+
+        if ct_np.shape[0] < 2 or ct_np.shape[1] < 2:
+            continue
+
+        chi2, p, dof, exp = chi2_contingency(ct_np)
+        n = ct_np.sum()
+        cramers_v = np.sqrt(chi2 / (n * (min(ct_np.shape) -1 )))
+        results.append({'col1': c1, 'col2': c2,
+                        'chi2': chi2, 'p_value': p,
+                        'cramers_v': cramers_v})
+    cat_cat_results = pl.DataFrame(results).sort('cramers_v', descending=True)
+
+    show(cat_cat_results)
     return

@@ -1,7 +1,9 @@
 # -- import --
 import polars as pl
+import pandas as pd
 import numpy as np
 import matplotlib
+import pyarrow
 
 # -- use gnome theme (ignore) -- 
 matplotlib.use("QtAgg")
@@ -50,3 +52,11 @@ df = df.with_columns(
 
 numeric_cols = df.select(cs.numeric()).columns
 category_cols = df.select(cs.string()).columns
+
+
+
+
+
+
+
+
