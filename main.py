@@ -14,8 +14,8 @@ import os
 from scipy import stats
 from sklearn.ensemble import IsolationForest
 
+import src.helper_func as hf
 from src.polar_viewer import show, show_tables
-from src.helper_func import *
 from src.dir_conf import GRAPH
 
 # --ignore Qt warning --
@@ -50,5 +50,3 @@ df = df.with_columns(
 
 numeric_cols = df.select(cs.numeric()).columns
 category_cols = df.select(cs.string()).columns
-
-show_isolation_forest_flags_matrix(df)
