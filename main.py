@@ -17,7 +17,7 @@ import os
 from scipy import stats
 from sklearn.ensemble import IsolationForest
 
-import src.helper_func as hf
+from helpers import *
 from src.polar_viewer import show, show_tables
 from src.dir_conf import GRAPH
 
@@ -54,5 +54,5 @@ df = df.with_columns(
 numeric_cols = df.select(cs.numeric()).columns
 category_cols = df.select(cs.string()).columns
 
-hf.plot_pca_analysis(df, path=GRAPH)
-hf.plot_hierarchical_clustering(df, path=GRAPH)
+plot_pca_analysis(df)
+plot_hierarchical_clustering(df)
