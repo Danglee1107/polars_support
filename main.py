@@ -54,5 +54,5 @@ df = df.with_columns(
 numeric_cols = df.select(cs.numeric()).columns
 category_cols = df.select(cs.string()).columns
 
-hf.plot_pca_analysis(df)
-hf.plot_hierarchical_clustering(df)
+hf.plot_pca_analysis(df, path=GRAPH)
+hf.plot_hierarchical_clustering(df, path=GRAPH)
