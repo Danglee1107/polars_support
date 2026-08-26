@@ -60,7 +60,7 @@ def plot_heatmap(data: DataSource,
     return
 
 def show_cat_cat(data: DataSource) -> None:
-    '''category-category'''
+    '''Display the relationship category-category'''
     category_cols = data.select(cs.string()).columns
     results= []
     for c1, c2 in combinations(category_cols,2):
@@ -85,7 +85,7 @@ def show_cat_cat(data: DataSource) -> None:
 
 def show_num_cat(data: DataSource, show_boxplot: bool = False) -> None:
     '''
-    numeric-category
+    Display the relationship numeric-category
     show_boxplot: bool is display top-N by eta_squared
     '''
 
@@ -136,6 +136,9 @@ def show_num_cat(data: DataSource, show_boxplot: bool = False) -> None:
 
 
 def plot_pca_analysis(data: DataSource, path: Path | None = None) -> None:
+    """Fit PCA on standardized numeric columns and plot cumulative explained
+    variance vs. number of components.
+    """
     numeric_cols = data.select(cs.numeric()).columns
     X = StandardScaler().fit_transform(data.select(numeric_cols).fill_null(0).to_numpy())
     pca = PCA().fit(X)
@@ -152,6 +155,10 @@ def plot_pca_analysis(data: DataSource, path: Path | None = None) -> None:
     return
 
 def plot_hierarchical_clustering(data: DataSource, path: Path | None = None) -> None:
+    """Compute a Pearson correlation matrix on numeric columns, convert it to
+    a distance matrix (1 - |corr|), and plot a dendrogram to reveal clusters
+    of correlated/redundant features.
+    """
     numeric_cols = data.select(cs.numeric()).columns
     pearson = data.select(numeric_cols).corr()
     corr_np = pearson.to_numpy()
